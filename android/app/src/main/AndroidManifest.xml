@@ -25,7 +25,7 @@
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
     <application
-        android:label="WakeDaddy"
+        android:label="Wake Daddy"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

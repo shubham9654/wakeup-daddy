@@ -72,9 +72,10 @@ flutter_launcher_icons:
   ios: true
   remove_alpha_ios: true
   image_path: "assets/icon/app_icon.png"
-  # Android 8+ adaptive icon: dark background matching the logo's own corners
-  # so the art blends seamlessly, with safe-zone padding so the mask never crops.
-  adaptive_icon_background: "#11111F"
+  # Android 8+ adaptive icon: the full-bleed purple art is the background so it
+  # fills the launcher's circle/squircle with no black ring; foreground is
+  # transparent so the clock isn't zoom-cropped by the foreground parallax.
+  adaptive_icon_background: "assets/icon/app_icon_background.png"
   adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
 
 # For information on the generic Dart part of this file, see the

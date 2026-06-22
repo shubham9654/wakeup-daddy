@@ -62,6 +62,20 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# App launcher icon generation. Put your icon at assets/icon/app_icon.png
+# (square, ideally 1024x1024 PNG), then run:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/icon/app_icon.png"
+  # Android 8+ adaptive icon: dark background matching the logo's own corners
+  # so the art blends seamlessly, with safe-zone padding so the mask never crops.
+  adaptive_icon_background: "#11111F"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

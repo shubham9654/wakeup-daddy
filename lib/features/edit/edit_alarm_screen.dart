@@ -369,7 +369,6 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
         title: const Text('Gradually increase volume'),
         subtitle: Text('Ramp up over $_gradualSeconds s'),
         contentPadding: EdgeInsets.zero,
-        activeThumbColor: AppColors.primary,
       ),
       if (_gradual)
         Slider(
@@ -385,7 +384,6 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
         onChanged: (v) => setState(() => _vibrate = v),
         title: const Text('Vibrate'),
         contentPadding: EdgeInsets.zero,
-        activeThumbColor: AppColors.primary,
       ),
       SwitchListTile(
         value: _flash,
@@ -393,7 +391,6 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
         title: const Text('Flash screen'),
         subtitle: const Text('Strobe the screen to wake you'),
         contentPadding: EdgeInsets.zero,
-        activeThumbColor: AppColors.primary,
       ),
     ];
   }
@@ -406,7 +403,6 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
         onChanged: (v) => setState(() => _snooze = v),
         title: const Text('Allow snooze'),
         contentPadding: EdgeInsets.zero,
-        activeThumbColor: AppColors.primary,
       ),
       if (_snooze) ...[
         _stepperRow('Snooze length', '$_snoozeMin min',
@@ -521,7 +517,6 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
         title: const Text('Penalty mode'),
         subtitle: Text('Donate ₹$_penaltyAmount to charity if ignored'),
         contentPadding: EdgeInsets.zero,
-        activeThumbColor: AppColors.primary,
       ),
       if (_penalty)
         Slider(
@@ -545,7 +540,6 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
         title: const Text('Accountability mode'),
         subtitle: const Text('Notify a friend if I don\'t wake up'),
         contentPadding: EdgeInsets.zero,
-        activeThumbColor: AppColors.primary,
       ),
       if (_accountability)
         TextField(
@@ -569,7 +563,6 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
         title: const Text('Morning routine'),
         subtitle: const Text('Run a routine after dismiss'),
         contentPadding: EdgeInsets.zero,
-        activeThumbColor: AppColors.primary,
       ),
       if (_routine)
         ...RoutineAction.values.map((a) => CheckboxListTile(

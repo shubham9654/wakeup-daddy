@@ -62,7 +62,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Card(
             child: SwitchListTile(
               value: cloud.isSignedIn,
-              activeThumbColor: AppColors.primary,
               title: const Text('Cloud alarm backup'),
               subtitle: Text(cloud.isSignedIn
                   ? 'Alarms auto-sync on every change'
@@ -150,19 +149,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
 
   Widget _textSetting(String label, String key, String hint) {
-    final controller = TextEditingController(
-        text: Storage.instance.getSetting<String>(key, '') ?? '');
+    final stored = Storage.instance.getSetting<String>(key, '') ?? '';
     return Card(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            labelText: label,
-            helperText: hint,
-            border: InputBorder.none,
-          ),
-          onChanged: (v) => Storage.instance.setSetting(key, v),
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+            TextFormField(
+              initialValue: stored,
+              onChanged: (v) => Storage.instance.setSetting(key, v),
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w600),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 6),
+                border: InputBorder.none,
+                hintText: hint,
+                hintStyle: TextStyle(
+                    color: AppColors.textMuted.withValues(alpha: .7),
+                    fontWeight: FontWeight.w400,
+                    fontSize: 15),
+              ),
+            ),
+          ],
         ),
       ),
     );

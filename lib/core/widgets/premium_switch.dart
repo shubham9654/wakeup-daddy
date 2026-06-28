@@ -31,11 +31,7 @@ class PremiumSwitch extends StatelessWidget {
         padding: const EdgeInsets.all(_pad),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(_h),
-          gradient: value
-              ? const LinearGradient(
-                  colors: [AppColors.primary, AppColors.accent])
-              : null,
-          color: value ? null : AppColors.surfaceAlt,
+          color: value ? AppColors.accent : AppColors.surfaceAlt,
           border: value
               ? null
               : Border.all(

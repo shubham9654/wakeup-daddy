@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme.dart';
 import '../../../core/utils.dart';
+import '../../../core/wallpapers.dart';
 import '../../../core/widgets/premium_switch.dart';
 import '../../../data/models/alarm_model.dart';
 import '../../../data/models/enums.dart';
@@ -60,7 +61,7 @@ class AlarmTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ---- Time + label + toggle ----
+                // ---- Time (left) + toggle (right) ----
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -87,23 +88,38 @@ class AlarmTile extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.textMuted),
                           ),
-                          const SizedBox(width: 10),
-                          Flexible(
-                            child: Text(
-                              alarm.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: AppColors.textMuted,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14),
-                            ),
-                          ),
                         ],
                       ),
                     ),
                     const SizedBox(width: 8),
                     PremiumSwitch(value: on, onChanged: onToggle),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                // ---- Wallpaper swatch + label ----
+                Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(5),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child:
+                            WallpaperView(Wallpapers.byIndex(alarm.wallpaper)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        alarm.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),

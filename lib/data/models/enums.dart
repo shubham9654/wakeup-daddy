@@ -1,11 +1,16 @@
 // Shared enums for the WakeDaddy domain model.
 
 enum AlarmSoundType {
+  uplift('Uplift', 'assets/audio/uplift.wav'),
+  digital('Digital', 'assets/audio/digital.wav'),
+  beep('Classic Beep', 'assets/audio/beep.wav'),
   pulse('Pulse', 'assets/audio/pulse.wav'),
-  nova('Nova', 'assets/audio/nova.wav'),
-  aurora('Aurora', 'assets/audio/aurora.wav'),
   chime('Chime', 'assets/audio/chime.wav'),
-  gentle('Gentle', 'assets/audio/gentle.wav');
+  radar('Radar', 'assets/audio/radar.wav'),
+  marimba('Marimba', 'assets/audio/marimba.wav'),
+  siren('Siren', 'assets/audio/siren.wav'),
+  cosmic('Cosmic', 'assets/audio/cosmic.wav'),
+  bells('Bells', 'assets/audio/bells.wav');
 
   const AlarmSoundType(this.label, this.asset);
   final String label;
@@ -35,6 +40,3 @@ enum MissionDifficulty {
   const MissionDifficulty(this.label);
   final String label;
 }
-
-/// Premium subscription tiers (revenue model).
-enum PlanTier { free, monthly, lifetime }

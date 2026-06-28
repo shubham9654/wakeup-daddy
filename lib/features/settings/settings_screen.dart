@@ -1,7 +1,9 @@
 import 'package:alarm/alarm.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/permissions.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
 import '../../data/models/alarm_model.dart';
@@ -9,11 +11,11 @@ import '../../data/models/enums.dart';
 import '../../data/models/mission_config.dart';
 import '../../data/storage.dart';
 import '../../services/alarm_service.dart';
-import '../../services/anticheat_service.dart';
-import '../../services/cloud_backup_service.dart';
 import '../../state/providers.dart';
-import '../premium/paywall_screen.dart';
+import '../coach/coach_screen.dart';
 
+/// Fully local settings — no accounts, no network. Profile + alarm defaults +
+/// permissions + a Buy-Me-a-Coffee support button.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -22,164 +24,255 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  @override
-  Widget build(BuildContext context) {
-    final premium = ref.watch(isPremiumProvider);
-    final tier = ref.watch(premiumProvider);
-    final cloud = CloudBackupService.instance;
-    final events = AntiCheatService.instance.recentEvents();
+  static const _coffeeUrl = 'https://buymeacoffee.com/shubhamsarkar';
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-            AppSpacing.pad, 4, AppSpacing.pad, 32),
-        children: [
-          // Subscription status
-          Card(
-            child: ListTile(
-              leading: Icon(
-                  premium ? Icons.workspace_premium : Icons.lock_open,
-                  color: premium ? AppColors.warning : AppColors.textMuted),
-              title: Text(premium
-                  ? '${tier.name[0].toUpperCase()}${tier.name.substring(1)} plan active'
-                  : 'Free plan'),
-              subtitle: Text(premium
-                  ? 'All features unlocked'
-                  : 'Upgrade to unlock premium features'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const PaywallScreen())),
-            ),
-          ),
+  late final TextEditingController _name = TextEditingController(
+      text: Storage.instance.getSetting<String>('user_name', '') ?? '');
 
-          _header('Profile'),
-          _textSetting('Your name', 'user_name', 'Used in accountability alerts'),
-          const SizedBox(height: 10),
-          _textSetting('Penalty charity', 'penalty_charity', 'Where penalties are donated'),
-
-          _header('Cloud backup & sync'),
-          Card(
-            child: SwitchListTile(
-              value: cloud.isSignedIn,
-              title: const Text('Cloud alarm backup'),
-              subtitle: Text(cloud.isSignedIn
-                  ? 'Alarms auto-sync on every change'
-                  : 'Sign in to back up your alarms'),
-              onChanged: (v) async {
-                if (v) {
-                  await cloud.signIn();
-                  await cloud.backup(ref.read(alarmsProvider));
-                }
-                setState(() {});
-              },
-            ),
-          ),
-          if (cloud.isSignedIn) ...[
-            const SizedBox(height: 10),
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.cloud_download),
-                title: const Text('Restore from cloud'),
-                onTap: () async {
-                  final restored = await cloud.restore();
-                  for (final a in restored) {
-                    await ref.read(alarmsProvider.notifier).save(a);
-                  }
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('Restored ${restored.length} alarms')));
-                  }
-                },
-              ),
-            ),
-          ],
-
-          _header('Anti-cheat log'),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: events.isEmpty
-                  ? const Text('No suspicious events detected. 🛡️',
-                      style: TextStyle(color: AppColors.textMuted))
-                  : Column(
-                      children: events.take(10).map((e) {
-                        final parts = e.split('|');
-                        return ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.warning_amber,
-                              color: AppColors.warning),
-                          title: Text(parts.length > 2 ? parts[2] : e),
-                          subtitle: Text(parts.first),
-                        );
-                      }).toList(),
-                    ),
-            ),
-          ),
-
-          _header('Developer / testing'),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.play_circle_outline),
-              title: const Text('Test alarm in 5 seconds'),
-              subtitle: const Text('Preview the ring + mission flow now'),
-              onTap: _testAlarm,
-            ),
-          ),
-
-          const SizedBox(height: 24),
-          const Center(
-            child: Text('WakeDaddy v1.0.0',
-                style: TextStyle(color: AppColors.textMuted)),
-          ),
-        ],
-      ),
-    );
+  bool get _vibrate =>
+      Storage.instance.getSetting<bool>('default_vibrate', true) ?? true;
+  bool get _gentle =>
+      Storage.instance.getSetting<bool>('default_gradual', true) ?? true;
+  AlarmSoundType get _sound {
+    final n = Storage.instance.getSetting<String>('default_sound', 'uplift');
+    return AlarmSoundType.values.firstWhere((s) => s.name == n,
+        orElse: () => AlarmSoundType.uplift);
   }
 
-  Widget _header(String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 24, 4, 8),
-        child: Text(text.toUpperCase(),
-            style: const TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2)),
-      );
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
 
-  Widget _textSetting(String label, String key, String hint) {
-    final stored = Storage.instance.getSetting<String>(key, '') ?? '';
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
           children: [
-            Text(label,
-                style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600)),
-            TextFormField(
-              initialValue: stored,
-              onChanged: (v) => Storage.instance.setSetting(key, v),
-              style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w600),
-              decoration: InputDecoration(
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 6),
-                border: InputBorder.none,
-                hintText: hint,
-                hintStyle: TextStyle(
-                    color: AppColors.textMuted.withValues(alpha: .7),
-                    fontWeight: FontWeight.w400,
-                    fontSize: 15),
+            const Text('Settings',
+                style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 20),
+
+            // ---- Profile ----
+            _group([
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Your name',
+                        style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600)),
+                    TextField(
+                      controller: _name,
+                      onChanged: (v) =>
+                          Storage.instance.setSetting('user_name', v),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        hintText: 'Used in accountability alerts',
+                      ),
+                    ),
+                  ],
+                ),
               ),
+            ]),
+            const SizedBox(height: 22),
+
+            // ---- Alarm defaults ----
+            _sectionLabel('DEFAULTS FOR NEW ALARMS'),
+            _group([
+              ListTile(
+                leading: const Icon(Icons.music_note, color: AppColors.accent),
+                title: const Text('Default alarm sound'),
+                subtitle: Text(_sound.label),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _pickSound,
+              ),
+              const _Line(),
+              SwitchListTile(
+                value: _vibrate,
+                onChanged: (v) => setState(() =>
+                    Storage.instance.setSetting('default_vibrate', v)),
+                secondary:
+                    const Icon(Icons.vibration, color: AppColors.accent),
+                title: const Text('Vibrate by default'),
+              ),
+              const _Line(),
+              SwitchListTile(
+                value: _gentle,
+                onChanged: (v) => setState(() =>
+                    Storage.instance.setSetting('default_gradual', v)),
+                secondary:
+                    const Icon(Icons.trending_up, color: AppColors.accent),
+                title: const Text('Gentle wake-up by default'),
+                subtitle: const Text('Gradually increase volume'),
+              ),
+            ]),
+            const SizedBox(height: 22),
+
+            // ---- Sleep & permissions ----
+            _sectionLabel('ALARM & SLEEP'),
+            _group([
+              ListTile(
+                leading: const Icon(Icons.nightlight_round,
+                    color: AppColors.accent),
+                title: const Text('Sleep coach'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const CoachScreen())),
+              ),
+              const _Line(),
+              ListTile(
+                leading:
+                    const Icon(Icons.verified_user, color: AppColors.accent),
+                title: const Text('Grant alarm permissions'),
+                subtitle: const Text(
+                    'Notifications, exact alarms, battery exemption'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  await Permissions.requestEssential();
+                  _toast('Permission requests sent');
+                },
+              ),
+              const _Line(),
+              ListTile(
+                leading: const Icon(Icons.play_circle_outline,
+                    color: AppColors.accent),
+                title: const Text('Test alarm in 5 seconds'),
+                subtitle: const Text('Preview the ring + mission flow'),
+                onTap: _testAlarm,
+              ),
+            ]),
+            const SizedBox(height: 22),
+
+            // ---- About ----
+            _sectionLabel('ABOUT'),
+            _group([
+              ListTile(
+                leading:
+                    const Icon(Icons.mail_outline, color: AppColors.accent),
+                title: const Text('Send feedback'),
+                trailing: const Icon(Icons.open_in_new, size: 18),
+                onTap: () => _launch(
+                    'mailto:?subject=WakeDaddy%20feedback'),
+              ),
+              const _Line(),
+              ListTile(
+                leading: const Icon(Icons.info_outline, color: AppColors.accent),
+                title: const Text('About WakeDaddy'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _showAbout,
+              ),
+            ]),
+            const SizedBox(height: 28),
+
+            // ---- Buy me a coffee ----
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => _launch(_coffeeUrl),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.warning,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                icon: const Icon(Icons.local_cafe),
+                label: const Text('Buy me a coffee',
+                    style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Center(
+              child: Text('WakeDaddy v1.0.0  •  100% local',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  // ---- helpers ----
+
+  Widget _group(List<Widget> children) => Container(
+        decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16)),
+        child: Column(children: children),
+      );
+
+  Widget _sectionLabel(String t) => Padding(
+        padding: const EdgeInsets.only(left: 6, bottom: 10),
+        child: Text(t,
+            style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.1)),
+      );
+
+  void _toast(String m) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(m)));
+
+  Future<void> _launch(String url) async {
+    final ok = await launchUrl(Uri.parse(url),
+        mode: LaunchMode.externalApplication);
+    if (!ok) _toast('Could not open link');
+  }
+
+  void _pickSound() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 14),
+            const Text('Default alarm sound',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+            const SizedBox(height: 8),
+            for (final s in AlarmSoundType.values)
+              ListTile(
+                title: Text(s.label),
+                trailing: _sound == s
+                    ? const Icon(Icons.check, color: AppColors.accent)
+                    : null,
+                onTap: () {
+                  Storage.instance.setSetting('default_sound', s.name);
+                  Navigator.pop(ctx);
+                  setState(() {});
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAbout() {
+    showAboutDialog(
+      context: context,
+      applicationName: 'WakeDaddy',
+      applicationVersion: 'v1.0.0',
+      applicationLegalese:
+          'A local-first alarm app. No accounts, no tracking, no network.',
+      children: const [
+        SizedBox(height: 12),
+        Text('Wake-up missions, sleep coaching, and accountability — '
+            'all stored privately on your device.'),
+      ],
     );
   }
 
@@ -194,7 +287,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ephemeral: true,
       createdAt: DateTime.now(),
     );
-    // Schedule directly via the plugin for an exact 5s preview.
     await AlarmService.instance.init();
     await Alarm.set(
       alarmSettings: AlarmSettings(
@@ -209,11 +301,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
-    // Register so the ring listener can resolve it.
     await ref.read(alarmsProvider.notifier).save(test);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Test alarm will ring in 5 seconds…')));
-    }
+    if (mounted) _toast('Test alarm will ring in 5 seconds…');
   }
+}
+
+class _Line extends StatelessWidget {
+  const _Line();
+  @override
+  Widget build(BuildContext context) =>
+      const Divider(height: 1, indent: 16, endIndent: 16);
 }

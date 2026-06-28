@@ -4,9 +4,10 @@ import 'package:alarm/alarm.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/permissions.dart';
 import 'core/theme.dart';
-import 'features/home/home_screen.dart';
 import 'features/ring/ring_screen.dart';
+import 'features/shell/main_shell.dart';
 import 'services/alarm_service.dart';
 import 'state/providers.dart';
 
@@ -26,9 +27,11 @@ class _WakeDaddyAppState extends ConsumerState<WakeDaddyApp> {
   @override
   void initState() {
     super.initState();
-    // Re-arm any stored alarms with the OS after launch/boot.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Re-arm any stored alarms with the OS after launch/boot.
       ref.read(alarmsProvider.notifier).rescheduleAll();
+      // No onboarding — make sure alarm permissions are requested once.
+      Permissions.requestEssential();
     });
 
     _ringSub = AlarmService.instance.ringingStream.listen((settings) {
@@ -69,11 +72,11 @@ class _WakeDaddyAppState extends ConsumerState<WakeDaddyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'WakeDaddy',
+      title: 'Wakeup Daddy',
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
       theme: AppTheme.dark,
-      home: const HomeScreen(),
+      home: const MainShell(),
     );
   }
 }

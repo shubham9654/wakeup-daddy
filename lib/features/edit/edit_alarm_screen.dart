@@ -1,19 +1,26 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../core/utils.dart';
+import '../../core/wallpapers.dart';
+import '../../data/storage.dart';
 import '../../data/models/alarm_model.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/mission_config.dart';
 import '../../services/routine_service.dart';
 import '../../state/providers.dart';
-import '../premium/paywall_screen.dart';
 import 'widgets/section_card.dart';
 
 class EditAlarmScreen extends ConsumerStatefulWidget {
   final AlarmModel? existing;
-  const EditAlarmScreen({super.key, this.existing});
+
+  /// When true (new alarm from the home + button), the time clock opens
+  /// immediately so the user can set the alarm time right away.
+  final bool autoPickTime;
+  const EditAlarmScreen(
+      {super.key, this.existing, this.autoPickTime = false});
 
   @override
   ConsumerState<EditAlarmScreen> createState() => _EditAlarmScreenState();
@@ -23,6 +30,7 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
   late TimeOfDay _time;
   late TextEditingController _label;
   late Set<int> _days;
+  late int _wallpaper;
   late AlarmSoundType _sound;
   late double _volume;
   late bool _gradual;
@@ -42,6 +50,9 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
   late TextEditingController _qrPayload;
   late TextEditingController _photoLabel;
 
+  /// Plays a short preview when the user taps a sound.
+  final AudioPlayer _preview = AudioPlayer();
+
   @override
   void initState() {
     super.initState();
@@ -49,13 +60,24 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
     _time = a != null
         ? TimeOfDay(hour: a.hour, minute: a.minute)
         : TimeOfDay.now();
+    // Pop the time clock straight away when creating a fresh alarm.
+    if (a == null && widget.autoPickTime) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _pickTime());
+    }
     _label = TextEditingController(text: a?.label ?? 'Alarm');
     _days = {...?a?.repeatDays};
-    _sound = a?.sound ?? AlarmSoundType.pulse;
+    _wallpaper = a?.wallpaper ?? 0;
+    // New alarms inherit the user's saved defaults from Settings.
+    final s = Storage.instance;
+    final defSoundName = s.getSetting<String>('default_sound', 'uplift');
+    final defSound = AlarmSoundType.values.firstWhere(
+        (x) => x.name == defSoundName,
+        orElse: () => AlarmSoundType.uplift);
+    _sound = a?.sound ?? defSound;
     _volume = a?.maxVolume ?? 1.0;
-    _gradual = a?.gradualVolume ?? true;
+    _gradual = a?.gradualVolume ?? (s.getSetting<bool>('default_gradual', true) ?? true);
     _gradualSeconds = a?.gradualSeconds ?? 30;
-    _vibrate = a?.vibrate ?? true;
+    _vibrate = a?.vibrate ?? (s.getSetting<bool>('default_vibrate', true) ?? true);
     _flash = a?.flash ?? false;
     _snooze = a?.snoozeEnabled ?? true;
     _snoozeMin = a?.snoozeMinutes ?? 5;
@@ -80,10 +102,20 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
     _buddy.dispose();
     _qrPayload.dispose();
     _photoLabel.dispose();
+    _preview.dispose();
     super.dispose();
   }
 
-  bool get _premium => ref.read(isPremiumProvider);
+  /// Select a sound and immediately play a short preview so the user can hear it.
+  Future<void> _selectSound(AlarmSoundType s) async {
+    setState(() => _sound = s);
+    try {
+      await _preview.stop();
+      await _preview.play(AssetSource(s.asset.replaceFirst('assets/', '')));
+    } catch (_) {
+      // ignore preview failures (e.g. no audio focus)
+    }
+  }
 
   void _save() {
     final base = widget.existing;
@@ -94,6 +126,7 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
       minute: _time.minute,
       repeatDays: _days,
       enabled: base?.enabled ?? true,
+      wallpaper: _wallpaper,
       sound: _sound,
       maxVolume: _volume,
       gradualVolume: _gradual,
@@ -119,86 +152,62 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
     Navigator.pop(context);
   }
 
-  Future<void> _requirePremium(VoidCallback onGranted) async {
-    if (_premium) {
-      onGranted();
-      return;
-    }
-    final upgraded = await Navigator.push<bool>(context,
-        MaterialPageRoute(builder: (_) => const PaywallScreen()));
-    if (upgraded == true && mounted) onGranted();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.existing == null ? 'New alarm' : 'Edit alarm'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: FilledButton(
-              onPressed: _save,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                minimumSize: const Size(0, 40),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30)),
-              ),
-              child: const Text('Save',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
-            ),
-          ),
-        ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+      // ---- Scrolling content + fixed bottom Save bar ----
+      body: Column(
         children: [
-          _timePicker(),
-          const SizedBox(height: 20),
-          _basics(),
-          _repeat(),
-          _soundSection(),
-          _missionSection(),
-          CollapsibleSection(
-            title: 'Wake-up & snooze',
-            icon: Icons.tune,
-            children: [..._intensityChildren(), ..._snoozeChildren()],
-          ),
-          CollapsibleSection(
-            title: 'Premium add-ons',
-            icon: Icons.workspace_premium,
-            premium: true,
-            children: [
-              ..._penaltyChildren(),
-              const Divider(height: 24),
-              ..._accountabilityChildren(),
-              const Divider(height: 24),
-              ..._routineChildren(),
-            ],
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(onPressed: _save, child: const Text('Save alarm')),
-          ),
-          if (widget.existing != null) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
-                onPressed: _delete,
-                style: TextButton.styleFrom(
-                    foregroundColor: AppColors.danger,
-                    padding: const EdgeInsets.symmetric(vertical: 14)),
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('Delete alarm',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              children: [
+                _timePicker(),
+                const SizedBox(height: 20),
+                _basics(),
+                _repeat(),
+                _soundSection(),
+                _wallpaperSection(),
+                _missionSection(),
+                CollapsibleSection(
+                  title: 'Wake-up & snooze',
+                  icon: Icons.tune,
+                  children: [..._intensityChildren(), ..._snoozeChildren()],
+                ),
+                CollapsibleSection(
+                  title: 'Extras',
+                  icon: Icons.auto_awesome,
+                  children: [
+                    ..._penaltyChildren(),
+                    const Divider(height: 24),
+                    ..._accountabilityChildren(),
+                    const Divider(height: 24),
+                    ..._routineChildren(),
+                  ],
+                ),
+                if (widget.existing != null) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton.icon(
+                      onPressed: _delete,
+                      style: TextButton.styleFrom(
+                          foregroundColor: AppColors.danger,
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 14)),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Delete alarm',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
+          _BottomSaveBar(onSave: _save),
         ],
       ),
     );
@@ -227,16 +236,17 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
     }
   }
 
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(context: context, initialTime: _time);
+    if (picked != null && mounted) setState(() => _time = picked);
+  }
+
   Widget _timePicker() {
     final hhmm = Fmt.time(_time.hour, _time.minute)
         .replaceAll(RegExp(r' (AM|PM)'), '');
     final ampm = _time.hour < 12 ? 'AM' : 'PM';
     return GestureDetector(
-      onTap: () async {
-        final picked =
-            await showTimePicker(context: context, initialTime: _time);
-        if (picked != null) setState(() => _time = picked);
-      },
+      onTap: _pickTime,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 28),
@@ -325,24 +335,89 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
   Widget _soundSection() {
     return SectionCard(
       title: 'Alarm sound',
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: AlarmSoundType.values.map((s) {
-          final sel = _sound == s;
-          return ChoiceChip(
-            label: Text(s.label),
-            selected: sel,
-            onSelected: (_) => setState(() => _sound = s),
-            showCheckmark: false,
-            selectedColor: AppColors.primary,
-            backgroundColor: AppColors.surfaceAlt,
-            side: BorderSide.none,
-            labelStyle: TextStyle(
-                color: sel ? Colors.white : AppColors.textMuted,
-                fontWeight: FontWeight.w600),
-          );
-        }).toList(),
+      child: SizedBox(
+        height: 42,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: AlarmSoundType.values.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (_, i) {
+            final s = AlarmSoundType.values[i];
+            final sel = _sound == s;
+            return GestureDetector(
+              onTap: () => _selectSound(s),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: sel ? AppColors.primary : AppColors.surfaceAlt,
+                  borderRadius: BorderRadius.circular(21),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(sel ? Icons.volume_up : Icons.play_arrow_rounded,
+                        size: 17,
+                        color: sel ? Colors.white : AppColors.textMuted),
+                    const SizedBox(width: 6),
+                    Text(s.label,
+                        style: TextStyle(
+                            color: sel ? Colors.white : AppColors.textMuted,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _wallpaperSection() {
+    return SectionCard(
+      title: 'Alarm wallpaper',
+      child: SizedBox(
+        height: 110,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: Wallpapers.all.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 10),
+          itemBuilder: (_, i) {
+            final wp = Wallpapers.all[i];
+            final sel = _wallpaper == i;
+            return GestureDetector(
+              onTap: () => setState(() => _wallpaper = i),
+              child: Container(
+                width: 70,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: sel ? Colors.white : Colors.transparent,
+                      width: 2.5),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      WallpaperView(wp),
+                      if (sel)
+                        const Align(
+                          alignment: Alignment.topRight,
+                          child: Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.check_circle,
+                                color: Colors.white, size: 18),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -511,9 +586,7 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
     return [
       SwitchListTile(
         value: _penalty,
-        onChanged: (v) => v
-            ? _requirePremium(() => setState(() => _penalty = true))
-            : setState(() => _penalty = false),
+        onChanged: (v) => setState(() => _penalty = v),
         title: const Text('Penalty mode'),
         subtitle: Text('Donate ₹$_penaltyAmount to charity if ignored'),
         contentPadding: EdgeInsets.zero,
@@ -534,9 +607,7 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
     return [
       SwitchListTile(
         value: _accountability,
-        onChanged: (v) => v
-            ? _requirePremium(() => setState(() => _accountability = true))
-            : setState(() => _accountability = false),
+        onChanged: (v) => setState(() => _accountability = v),
         title: const Text('Accountability mode'),
         subtitle: const Text('Notify a friend if I don\'t wake up'),
         contentPadding: EdgeInsets.zero,
@@ -557,9 +628,7 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
     return [
       SwitchListTile(
         value: _routine,
-        onChanged: (v) => v
-            ? _requirePremium(() => setState(() => _routine = true))
-            : setState(() => _routine = false),
+        onChanged: (v) => setState(() => _routine = v),
         title: const Text('Morning routine'),
         subtitle: const Text('Run a routine after dismiss'),
         contentPadding: EdgeInsets.zero,
@@ -575,5 +644,30 @@ class _EditAlarmScreenState extends ConsumerState<EditAlarmScreen> {
               activeColor: AppColors.primary,
             )),
     ];
+  }
+}
+
+/// Fixed Save bar pinned to the bottom of the alarm editor.
+class _BottomSaveBar extends StatelessWidget {
+  final VoidCallback onSave;
+  const _BottomSaveBar({required this.onSave});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.bg,
+        border: Border(top: BorderSide(color: AppColors.surfaceAlt, width: .5)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+          16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+      child: SizedBox(
+        width: double.infinity,
+        child: FilledButton(
+          onPressed: onSave,
+          child: const Text('Save'),
+        ),
+      ),
+    );
   }
 }

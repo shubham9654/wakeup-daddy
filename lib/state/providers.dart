@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/alarm_model.dart';
-import '../data/models/enums.dart';
 import '../data/models/sleep_log.dart';
+import '../data/models/wake_event.dart';
 import '../data/storage.dart';
 import '../services/alarm_service.dart';
 import '../services/cloud_backup_service.dart';
@@ -67,28 +67,18 @@ class SleepLogsNotifier extends Notifier<List<SleepLog>> {
 final sleepLogsProvider =
     NotifierProvider<SleepLogsNotifier, List<SleepLog>>(SleepLogsNotifier.new);
 
-/// Premium / subscription state (revenue model).
-class PremiumNotifier extends Notifier<PlanTier> {
-  static const _key = 'plan_tier';
-
+/// Recorded alarm dismissals — the source of truth for the Report tab.
+class WakeEventsNotifier extends Notifier<List<WakeEvent>> {
   @override
-  PlanTier build() {
-    final name = Storage.instance.getSetting<String>(_key, PlanTier.free.name);
-    return PlanTier.values.byName(name ?? 'free');
-  }
+  List<WakeEvent> build() => Storage.instance.readWakeEvents();
 
-  Future<void> setTier(PlanTier tier) async {
-    await Storage.instance.setSetting(_key, tier.name);
-    state = tier;
+  Future<void> add(WakeEvent e) async {
+    await Storage.instance.writeWakeEvent(e);
+    state = Storage.instance.readWakeEvents();
   }
-
-  bool get isPremium => state != PlanTier.free;
 }
 
-final premiumProvider =
-    NotifierProvider<PremiumNotifier, PlanTier>(PremiumNotifier.new);
+final wakeEventsProvider =
+    NotifierProvider<WakeEventsNotifier, List<WakeEvent>>(
+        WakeEventsNotifier.new);
 
-/// Convenience boolean.
-final isPremiumProvider = Provider<bool>((ref) {
-  return ref.watch(premiumProvider) != PlanTier.free;
-});

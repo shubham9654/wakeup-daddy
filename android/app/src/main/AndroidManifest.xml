@@ -18,14 +18,14 @@
     <uses-permission android:name="android.permission.FLASHLIGHT" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
-    <!-- ===== Cloud / accountability ===== -->
+    <!-- ===== Accountability (SMS deep-link) ===== -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
     <application
-        android:label="Wake Daddy"
+        android:label="Wakeup Daddy"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

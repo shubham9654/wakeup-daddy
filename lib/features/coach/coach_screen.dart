@@ -6,7 +6,6 @@ import '../../core/theme.dart';
 import '../../data/storage.dart';
 import '../../services/sleep_coach_service.dart';
 import '../../state/providers.dart';
-import '../premium/paywall_screen.dart';
 
 /// AI Wake-Up Coach dashboard: pattern insight + bedtime recommendation + log.
 class CoachScreen extends ConsumerWidget {
@@ -14,7 +13,6 @@ class CoachScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final premium = ref.watch(isPremiumProvider);
     final logs = ref.watch(sleepLogsProvider);
     final alarms = ref.watch(alarmsProvider);
 
@@ -33,12 +31,7 @@ class CoachScreen extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(
             AppSpacing.pad, 4, AppSpacing.pad, 32),
         children: [
-          if (!premium) ...[
-            _LockedBanner(onUpgrade: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const PaywallScreen()))),
-            const SizedBox(height: AppSpacing.gap),
-          ],
-          _InsightCard(insight: insight, blurred: !premium),
+          _InsightCard(insight: insight),
           const SizedBox(height: AppSpacing.gap),
           _bedtimeCheckIn(context, ref),
           const SizedBox(height: 28),
@@ -105,7 +98,7 @@ class CoachScreen extends ConsumerWidget {
               .setSetting('last_bedtime', DateTime.now().toIso8601String());
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Sleep well 😴 Bedtime logged.')));
+                const SnackBar(content: Text('Sleep well. Bedtime logged.')));
             ref.invalidate(sleepLogsProvider);
           }
         },
@@ -116,8 +109,7 @@ class CoachScreen extends ConsumerWidget {
 
 class _InsightCard extends StatelessWidget {
   final SleepInsight insight;
-  final bool blurred;
-  const _InsightCard({required this.insight, required this.blurred});
+  const _InsightCard({required this.insight});
 
   @override
   Widget build(BuildContext context) {
@@ -147,9 +139,7 @@ class _InsightCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            blurred
-                ? 'Upgrade to Premium to unlock personalised coaching insights and your full sleep trend analysis.'
-                : insight.detail,
+            insight.detail,
             style: const TextStyle(color: AppColors.textMuted, height: 1.5),
           ),
         ],
@@ -184,20 +174,3 @@ class _InsightCard extends StatelessWidget {
   }
 }
 
-class _LockedBanner extends StatelessWidget {
-  final VoidCallback onUpgrade;
-  const _LockedBanner({required this.onUpgrade});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: AppColors.warning.withValues(alpha: .12),
-      child: ListTile(
-        leading: const Icon(Icons.lock, color: AppColors.warning),
-        title: const Text('Coach is in preview'),
-        subtitle: const Text('Upgrade to unlock full insights'),
-        trailing: FilledButton(onPressed: onUpgrade, child: const Text('Go Pro')),
-      ),
-    );
-  }
-}

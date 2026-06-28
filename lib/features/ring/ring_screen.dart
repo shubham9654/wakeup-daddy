@@ -7,9 +7,11 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/theme.dart';
 import '../../core/utils.dart';
+import '../../core/wallpapers.dart';
 import '../../data/models/alarm_model.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/sleep_log.dart';
+import '../../data/models/wake_event.dart';
 import '../../data/storage.dart';
 import '../../services/accountability_service.dart';
 import '../../services/alarm_service.dart';
@@ -123,6 +125,7 @@ class _RingScreenState extends ConsumerState<RingScreen>
     _accountabilityTimer?.cancel();
     await AlarmService.instance.dismiss(widget.alarm);
     _logSleep();
+    _logWakeEvent();
     _maybeRunRoutine();
 
     final alarms = ref.read(alarmsProvider.notifier);
@@ -156,6 +159,19 @@ class _RingScreenState extends ConsumerState<RingScreen>
         ));
   }
 
+  void _logWakeEvent() {
+    if (widget.alarm.ephemeral) return; // don't pollute reports with tests
+    final now = DateTime.now();
+    ref.read(wakeEventsProvider.notifier).add(WakeEvent(
+          id: const Uuid().v4(),
+          alarmId: widget.alarm.id,
+          scheduledAt: _startedAt,
+          dismissedAt: now,
+          durationSec: now.difference(_startedAt).inSeconds,
+          snoozeCount: _snoozesUsed,
+        ));
+  }
+
   void _maybeRunRoutine() {
     if (!widget.alarm.routineEnabled) return;
     final actions = widget.alarm.routineActions
@@ -170,6 +186,9 @@ class _RingScreenState extends ConsumerState<RingScreen>
   @override
   Widget build(BuildContext context) {
     final now = TimeOfDay.now();
+    final wp = Wallpapers.byIndex(widget.alarm.wallpaper);
+    final fg = wp.onColor;
+    final fgMuted = fg.withValues(alpha: .7);
     final canSnooze = widget.alarm.snoozeEnabled &&
         (widget.alarm.maxSnoozes == 0 ||
             _snoozesUsed < widget.alarm.maxSnoozes);
@@ -179,10 +198,21 @@ class _RingScreenState extends ConsumerState<RingScreen>
       child: AnimatedBuilder(
         animation: _flash,
         builder: (context, child) {
-          final bg = widget.alarm.flash
-              ? Color.lerp(AppColors.bg, AppColors.accent, _flash.value)!
-              : AppColors.bg;
-          return Scaffold(backgroundColor: bg, body: child);
+          return Scaffold(
+            body: Stack(
+              children: [
+                Positioned.fill(child: WallpaperView(wp)),
+                if (widget.alarm.flash)
+                  Positioned.fill(
+                    child: ColoredBox(
+                      color:
+                          AppColors.accent.withValues(alpha: _flash.value * .5),
+                    ),
+                  ),
+                child!,
+              ],
+            ),
+          );
         },
         child: SafeArea(
           child: Padding(
@@ -191,15 +221,18 @@ class _RingScreenState extends ConsumerState<RingScreen>
               children: [
                 const Spacer(),
                 Text(widget.alarm.label.toUpperCase(),
-                    style: const TextStyle(
+                    style: TextStyle(
                         letterSpacing: 4,
-                        color: AppColors.textMuted,
+                        color: fgMuted,
                         fontWeight: FontWeight.w600)),
                 const SizedBox(height: 12),
                 Text(
                   Fmt.time(now.hour, now.minute),
-                  style: const TextStyle(
-                      fontSize: 84, fontWeight: FontWeight.w900, height: 1),
+                  style: TextStyle(
+                      fontSize: 84,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                      color: fg),
                 ),
                 const SizedBox(height: 8),
                 if (widget.alarm.mission.type != MissionType.none)
@@ -258,8 +291,7 @@ class _RingScreenState extends ConsumerState<RingScreen>
                 if (widget.alarm.snoozeEnabled)
                   TextButton(
                     onPressed: canSnooze ? _snooze : null,
-                    style: TextButton.styleFrom(
-                        foregroundColor: AppColors.textMuted),
+                    style: TextButton.styleFrom(foregroundColor: fgMuted),
                     child: Text(
                       canSnooze
                           ? 'Snooze ${widget.alarm.snoozeMinutes} min'

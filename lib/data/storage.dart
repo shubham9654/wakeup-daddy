@@ -4,16 +4,19 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import 'models/alarm_model.dart';
 import 'models/sleep_log.dart';
+import 'models/wake_event.dart';
 
 /// Thin persistence layer over Hive CE. Everything is stored as JSON strings
 /// so we never need generated TypeAdapters — the models own their (de)serialization.
 class Storage {
   static const _alarmsBox = 'alarms';
   static const _sleepBox = 'sleep_logs';
+  static const _wakeBox = 'wake_events';
   static const _settingsBox = 'settings';
 
   late final Box<String> alarms;
   late final Box<String> sleepLogs;
+  late final Box<String> wakeEvents;
   late final Box settings;
 
   static final Storage instance = Storage._();
@@ -23,6 +26,7 @@ class Storage {
     await Hive.initFlutter();
     alarms = await Hive.openBox<String>(_alarmsBox);
     sleepLogs = await Hive.openBox<String>(_sleepBox);
+    wakeEvents = await Hive.openBox<String>(_wakeBox);
     settings = await Hive.openBox(_settingsBox);
   }
 
@@ -47,6 +51,15 @@ class Storage {
 
   Future<void> writeSleepLog(SleepLog log) =>
       sleepLogs.put(log.id, jsonEncode(log.toJson()));
+
+  // ---- Wake events ----
+  List<WakeEvent> readWakeEvents() => wakeEvents.values
+      .map((s) => WakeEvent.fromJson(jsonDecode(s)))
+      .toList()
+    ..sort((a, b) => b.dismissedAt.compareTo(a.dismissedAt));
+
+  Future<void> writeWakeEvent(WakeEvent e) =>
+      wakeEvents.put(e.id, jsonEncode(e.toJson()));
 
   // ---- Settings (key/value) ----
   T? getSetting<T>(String key, [T? fallback]) =>

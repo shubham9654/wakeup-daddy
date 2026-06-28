@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// WakeDaddy brand palette — dark, high-contrast, made to be readable at 6 AM.
+/// WakeDaddy brand palette — Alarmy-style: near-black canvas, a hot red for
+/// primary actions, and a cyan accent for toggles/selection.
 class AppColors {
-  static const Color bg = Color(0xFF0B0E14);
-  static const Color surface = Color(0xFF151A23);
-  static const Color surfaceAlt = Color(0xFF1E2530);
-  static const Color primary = Color(0xFF6C5CE7); // electric indigo
-  static const Color accent = Color(0xFF9B8CFF); // soft violet
-  static const Color success = Color(0xFF2DD4A7);
-  static const Color warning = Color(0xFFF5D547); // clean yellow (no orange)
-  static const Color danger = Color(0xFFFF5A6A);
-  static const Color textPrimary = Color(0xFFF4F6FB);
-  static const Color textMuted = Color(0xFF8089A0);
+  static const Color bg = Color(0xFF000000);
+  static const Color surface = Color(0xFF1C1C1E);
+  static const Color surfaceAlt = Color(0xFF2A2A2D);
+  static const Color primary = Color(0xFFFB4E63); // brand red (the ONLY accent)
+  static const Color accent = Color(0xFFFB4E63); // same red — no blue/cyan
+  static const Color success = Color(0xFF2DD4A7); // semantic only (correct ✓)
+  static const Color warning = Color(0xFFFB4E63); // unified to brand red
+  static const Color danger = Color(0xFFFB4E63);
+  static const Color textPrimary = Color(0xFFF7F8FA);
+  static const Color textMuted = Color(0xFF8A8A8E);
 
-  /// Brand gradient used on hero cards and primary actions.
+  /// Brand gradient used on hero cards and primary actions — red shades only.
   static const LinearGradient brandGradient = LinearGradient(
-    colors: [primary, accent],
+    colors: [Color(0xFFFB4E63), Color(0xFFFF5C72)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -69,7 +70,7 @@ class AppTheme {
         thumbColor: const WidgetStatePropertyAll(Colors.white),
         trackColor: WidgetStateProperty.resolveWith(
           (s) => s.contains(WidgetState.selected)
-              ? AppColors.primary
+              ? AppColors.accent
               : AppColors.surfaceAlt,
         ),
         trackOutlineColor: WidgetStateProperty.resolveWith(
@@ -92,6 +93,26 @@ class AppTheme {
           ),
           textStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16),
         ),
+      ),
+      // Force the clock/time picker onto the brand red (no default blue).
+      timePickerTheme: TimePickerThemeData(
+        backgroundColor: AppColors.surface,
+        dialHandColor: AppColors.primary,
+        dialBackgroundColor: AppColors.surfaceAlt,
+        hourMinuteColor: WidgetStateColor.resolveWith((s) =>
+            s.contains(WidgetState.selected)
+                ? AppColors.primary.withValues(alpha: .25)
+                : AppColors.surfaceAlt),
+        hourMinuteTextColor: AppColors.textPrimary,
+        dayPeriodColor: WidgetStateColor.resolveWith((s) =>
+            s.contains(WidgetState.selected)
+                ? AppColors.primary.withValues(alpha: .25)
+                : Colors.transparent),
+        dayPeriodTextColor: AppColors.textPrimary,
+        entryModeIconColor: AppColors.primary,
+      ),
+      datePickerTheme: const DatePickerThemeData(
+        backgroundColor: AppColors.surface,
       ),
     );
   }

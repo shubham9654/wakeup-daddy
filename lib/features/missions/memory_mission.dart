@@ -7,7 +7,7 @@ import '../../data/models/enums.dart';
 import '../../data/models/mission_config.dart';
 import 'mission_scaffold.dart';
 
-/// Classic memory match game. Flip cards to find all the emoji pairs.
+/// Classic memory match game. Flip cards to find all the icon pairs.
 class MemoryMission extends StatefulWidget {
   final MissionConfig config;
   final VoidCallback onComplete;
@@ -19,11 +19,20 @@ class MemoryMission extends StatefulWidget {
 }
 
 class _MemoryMissionState extends State<MemoryMission> {
-  static const _icons = [
-    '🔥', '⚡', '🌞', '⏰', '🚀', '⭐', '🌈', '🎯', '💎', '🦊'
+  static const _icons = <IconData>[
+    Icons.local_fire_department,
+    Icons.bolt,
+    Icons.wb_sunny,
+    Icons.alarm,
+    Icons.rocket_launch,
+    Icons.star,
+    Icons.favorite,
+    Icons.flag,
+    Icons.diamond,
+    Icons.pets,
   ];
 
-  late List<String> _deck;
+  late List<IconData> _deck;
   final Set<int> _matched = {};
   final List<int> _flipped = [];
   bool _busy = false;
@@ -104,10 +113,9 @@ class _MemoryMissionState extends State<MemoryMission> {
                 borderRadius: BorderRadius.circular(16),
               ),
               alignment: Alignment.center,
-              child: Text(
-                revealed ? _deck[i] : '',
-                style: const TextStyle(fontSize: 36),
-              ),
+              child: revealed
+                  ? Icon(_deck[i], size: 36, color: Colors.white)
+                  : const SizedBox.shrink(),
             ),
           );
         },

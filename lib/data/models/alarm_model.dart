@@ -17,6 +17,9 @@ class AlarmModel {
 
   final bool enabled;
 
+  /// Index into [Wallpapers.all] for the ring-screen background.
+  final int wallpaper;
+
   // --- Sound & wake intensity ---
   final AlarmSoundType sound;
   final double maxVolume; // 0.0 - 1.0
@@ -54,7 +57,8 @@ class AlarmModel {
     required this.minute,
     this.repeatDays = const {},
     this.enabled = true,
-    this.sound = AlarmSoundType.pulse,
+    this.wallpaper = 0,
+    this.sound = AlarmSoundType.uplift,
     this.maxVolume = 1.0,
     this.gradualVolume = true,
     this.gradualSeconds = 30,
@@ -82,7 +86,7 @@ class AlarmModel {
     for (final s in AlarmSoundType.values) {
       if (s.name == name) return s;
     }
-    return AlarmSoundType.pulse;
+    return AlarmSoundType.uplift;
   }
 
   AlarmModel copyWith({
@@ -91,6 +95,7 @@ class AlarmModel {
     int? minute,
     Set<int>? repeatDays,
     bool? enabled,
+    int? wallpaper,
     AlarmSoundType? sound,
     double? maxVolume,
     bool? gradualVolume,
@@ -115,6 +120,7 @@ class AlarmModel {
       minute: minute ?? this.minute,
       repeatDays: repeatDays ?? this.repeatDays,
       enabled: enabled ?? this.enabled,
+      wallpaper: wallpaper ?? this.wallpaper,
       sound: sound ?? this.sound,
       maxVolume: maxVolume ?? this.maxVolume,
       gradualVolume: gradualVolume ?? this.gradualVolume,
@@ -163,6 +169,7 @@ class AlarmModel {
         'minute': minute,
         'repeatDays': repeatDays.toList(),
         'enabled': enabled,
+        'wallpaper': wallpaper,
         'sound': sound.name,
         'maxVolume': maxVolume,
         'gradualVolume': gradualVolume,
@@ -190,6 +197,7 @@ class AlarmModel {
         minute: j['minute'],
         repeatDays: (j['repeatDays'] as List).map((e) => e as int).toSet(),
         enabled: j['enabled'] ?? true,
+        wallpaper: j['wallpaper'] ?? 0,
         sound: _soundFromName(j['sound']),
         maxVolume: (j['maxVolume'] ?? 1.0).toDouble(),
         gradualVolume: j['gradualVolume'] ?? true,

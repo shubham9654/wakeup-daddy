@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Wake Daddy</string>
+	<string>Wakeup Daddy</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>WakeDaddy</string>
+	<string>Wakeup Daddy</string>
 	<key>NSCameraUsageDescription</key>
 	<string>WakeDaddy uses the camera so you can scan a QR code or photograph an object to dismiss an alarm.</string>
 	<key>NSMotionUsageDescription</key>
